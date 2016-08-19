@@ -1,8 +1,9 @@
 import Vapor
+import Fluent
 import Foundation
 
 final class Pokemon: Model {
-    var id: FluentValue?
+    var id: Node?
     var name: String
     var time: Int
 
@@ -12,16 +13,31 @@ final class Pokemon: Model {
     }
 
     init(name: String, time: Int) {
-        id = nil
         self.name = name
         self.time = time
     }
-
-    init(serialized: [String: FluentValue]) {
-        id = serialized["id"]
-        name = serialized["name"].string ?? ""
-        time = serialized["time"].int ?? 0
+    
+    init(node: Node, in context: Context) throws {
+        id = try node.extract("id")
+        name = try node.extract("name")
+        time = try node.extract("time")
     }
+    
+    func makeNode() throws -> Node {
+        return try Node(node: [
+            "id"  : id,
+            "name": name,
+            "time": time
+        ])
+    }
+    static func prepare(_ database: Database) throws {
+        //
+    }
+    
+    static func revert(_ database: Database) throws {
+        //
+    }
+    
 }
 
 // MARK: Date
