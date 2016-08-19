@@ -1,4 +1,5 @@
 import Vapor
+import HTTP
 import VaporMustache
 import VaporMySQL
 
@@ -9,7 +10,9 @@ let mustache = VaporMustache.Provider(withIncludes: [
 
 let mysql = try VaporMySQL.Provider(host: "localhost", user: "root", password: "", database: "pokedex")
 
-let drop = Droplet(providers: [mustache, mysql], preparations: [Pokemon.self])
+let drop = Droplet(preparations: [Pokemon.self], providers: [VaporMustache.Provider.self], initializedProviders: [mysql])
+
+let _ = drop.config["app", "key"].string ?? ""
 
 drop.get("pokemon") { request in
     return try Pokemon.all().makeResponse(request: request)
@@ -20,7 +23,7 @@ drop.post("pokemon") { request in
         throw Abort.custom(status: .badRequest, message: "Please include a name.")
     }
 
-    if let pokemon = try Pokemon.filter("name", name).first() {
+    if let pokemon = try Pokemon.query().filter("name", name).first() {
         throw Abort.custom(status: .badRequest, message: "Duplicate Pokémon.")
     }
 
@@ -52,19 +55,19 @@ drop.get("pokemon", Pokemon.self) { request, pokemon in
 }
 
 class InvalidParameterMiddleware: Middleware {
-    init() {}
 
     func respond(to request: Request, chainingTo next: Responder) throws -> Response {
         do {
             return try next.respond(to: request)
-        } catch Abort.invalidParameter(_, let type) where type is Pokemon.Type {
-            return try drop.view("not-found.mustache").makeResponse(for: request)
+        } catch Abort.notFound {
+            return try drop.view("not-found.mustache").makeResponse()
         }
     }
+
 }
 
 let middleware = InvalidParameterMiddleware()
 
-drop.globalMiddleware.append(middleware)
+drop.middleware.append(middleware)
 
 drop.serve()
